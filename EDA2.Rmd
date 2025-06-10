@@ -1,0 +1,137 @@
+---
+title: "EDA"
+output: html_document
+date: "2025-03-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE}
+injury <- read.csv("Injury_History.csv", stringsAsFactors = FALSE)
+
+stats <- read.csv("NBA Players Stats 201617.csv", stringsAsFactors = FALSE)
+```
+
+
+```{r echo=FALSE}
+library(dplyr)
+library(stringr)
+
+
+injury <- injury %>%
+  mutate(Date = as.Date(Date, format = "%d/%m/%Y"))
+
+# Filter games to include only those after 2016-10-25 and on or before 2017-04-12
+injury_2016 <- injury %>%
+  filter(Date > "2016-10-25" & Date <= "2017-04-12")
+
+stats_clean <- stats %>%
+  # Group by Player
+  group_by(Player) %>%
+  # Keep only the row where the team is 'TOT' if multiple rows exist, or keep all rows if only one
+  filter(n() == 1 | Tm == "TOT") %>%
+  ungroup() %>%
+  # Clean the Player names
+  mutate(Player = sub("\\\\.*", "", Player))
+```
+
+```{r echo=FALSE}
+library(stringr)
+
+injury_2016_IL <- injury_2016 %>%
+  filter(str_detect(Notes, "placed on IL"))
+
+injury_2016_IL_count <- injury_2016_IL %>%
+  count(Name, sort = TRUE) %>%
+  rename(times_on_IL = n)
+
+```
+
+```{r echo=FALSE}
+library(stringi)
+
+merged_data <- injury_2016_IL_count %>%
+  rename(Player = Name) %>%
+  left_join(stats_clean %>%
+              mutate(Player = stri_trans_general(Player, "Latin-ASCII")), by = "Player") %>%
+  select(Player, times_on_IL, G, MP, Age)
+
+merged_data_filtered <- merged_data %>%
+  filter(G >= 40)
+```
+
+```{r echo=FALSE}
+library(ggplot2)
+
+ggplot(merged_data_filtered, aes(x = times_on_IL)) +
+  geom_histogram(aes(y = ..density..), bins = 30, fill = "blue", alpha = 0.5) +
+  geom_density(color = "red", size = 1) +
+  labs(title = "Distribution of Times on IL", x = "Times on IL", y = "Density")
+
+qqnorm(merged_data_filtered$times_on_IL)
+qqline(merged_data_filtered$times_on_IL, col = "red")
+
+model <- lm(times_on_IL ~ G + MP + Age, data = merged_data_filtered)
+plot(model, which = 1)
+
+```
+
+## Gap Statement
+
+Although prior research has examined the role of load management in injury prevention and player recovery, there is limited statisical analysis connecting rest patterns to team performance metrics and individual player durability. By comparing team performance and winning percentages based on varying rest days, and analyzing injury frequency relative to minutes played, games played, and age, this study addresses the gap in understanding how load management strategies affect both immediate success and long-term player availability in professional basketball.
+
+## True Question
+
+What is the relationship between load management strategies, team performance across different rest periods, and player longevity as measured by injury frequency, and how can teams optimize rest to maximize both short-term success and long-term player availability in professional basketball?
+
+
+```{r echo=FALSE}
+
+library(ggplot2)
+
+# Scatter plot: Times on IL vs Games played (G)
+ggplot(merged_data_filtered, aes(x = G, y = times_on_IL)) +
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  labs(title = "Times on IL vs Games Played", x = "Games Played (G)", y = "Times on IL")
+
+# Scatter plot: Times on IL vs Minutes Played (MP) 
+ggplot(merged_data_filtered, aes(x = MP, y = times_on_IL)) +
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  labs(title = "Times on IL vs Minutes Played", x = "Minutes Played (MP)", y = "Times on IL")
+
+# Scatter plot: Times on IL vs Age
+ggplot(merged_data_filtered, aes(x = Age, y = times_on_IL)) +
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  labs(title = "Times on IL vs Age", x = "Age", y = "Times on IL")
+```
+```{r}
+model_mp <- lm(times_on_IL ~ MP, data = merged_data_filtered)
+
+model_age <- lm(times_on_IL ~ Age, data = merged_data_filtered)
+
+summary(model_mp)$coefficients["MP", "Pr(>|t|)"]
+summary(model_age)$coefficients["Age", "Pr(>|t|)"]
+```
+
+
+```{r echo=FALSE}
+library(ggplot2)
+library(reshape2)
+
+# Create a heatmap of the correlation matrix
+correlation_matrix <- merged_data_filtered %>%
+  select(times_on_IL, MP, Age) %>%
+  cor() %>%
+  melt()
+
+ggplot(correlation_matrix, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2() +
+  labs(title = "Correlation Heatmap", x = "Variables", y = "Variables") +
+  theme_minimal()
+```

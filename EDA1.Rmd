@@ -1,0 +1,297 @@
+---
+title: "EDA"
+output: html_document
+date: "2025-03-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE}
+games <- read.csv("games.csv", stringsAsFactors = FALSE)
+
+teams <- read.csv("teams.csv", stringsAsFactors = FALSE)
+```
+
+```{r echo=FALSE}
+games <- merge(games, teams[, c("TEAM_ID", "ABBREVIATION")], by.x = "HOME_TEAM_ID", by.y = "TEAM_ID", all.x = TRUE)
+colnames(games)[colnames(games) == "ABBREVIATION"] <- "HOME_TEAM"
+
+games <- merge(games, teams[, c("TEAM_ID", "ABBREVIATION")], by.x = "VISITOR_TEAM_ID", by.y = "TEAM_ID", all.x = TRUE)
+colnames(games)[colnames(games) == "ABBREVIATION"] <- "VISITOR_TEAM"
+
+games <- games[, c("HOME_TEAM", "VISITOR_TEAM", setdiff(names(games), c("HOME_TEAM", "VISITOR_TEAM", "HOME_TEAM_ID", "VISITOR_TEAM_ID")))]
+```
+
+```{r echo=FALSE}
+library(dplyr)
+games <- games %>%
+  mutate(GAME_DATE_EST = as.Date(GAME_DATE_EST))
+
+# Filter games to include only those after 2016-10-25 and on or before 2017-04-12
+games <- games %>%
+  filter(GAME_DATE_EST > "2016-10-25" & GAME_DATE_EST <= "2017-04-12")
+```
+
+```{r echo=FALSE}
+okc <- subset(games, HOME_TEAM == "OKC" | VISITOR_TEAM == "OKC")
+mil <- subset(games, HOME_TEAM == "MIL" | VISITOR_TEAM == "MIL")
+ind <- subset(games, HOME_TEAM == "IND" | VISITOR_TEAM == "IND")
+mem <- subset(games, HOME_TEAM == "MEM" | VISITOR_TEAM == "MEM")
+```
+
+
+```{r echo=FALSE}
+okc_clean <- okc %>%
+  mutate(
+    is_home = ifelse(HOME_TEAM == "OKC", TRUE, FALSE),
+    
+    # Extract OKC's stats
+    PTS = ifelse(is_home, PTS_home, PTS_away),
+    REB = ifelse(is_home, REB_home, REB_away),
+    AST = ifelse(is_home, AST_home, AST_away),
+    FG_PCT = ifelse(is_home, FG_PCT_home, FG_PCT_away),
+    FT_PCT = ifelse(is_home, FT_PCT_home, FT_PCT_away),
+    FG_3_PCT = ifelse(is_home, FG3_PCT_home, FG3_PCT_away),
+
+    OKC_WINS = ifelse((is_home & HOME_TEAM_WINS == 1) | (!is_home & HOME_TEAM_WINS == 0), 1, 0)
+  ) %>%
+  select(GAME_DATE_EST, PTS, REB, AST, FG_PCT, FT_PCT, FG_3_PCT, OKC_WINS)  # Keep only relevant 
+mil_clean <- mil %>%
+  mutate(
+    is_home = ifelse(HOME_TEAM == "MIL", TRUE, FALSE),
+    
+    # Extract MIL's stats
+    PTS = ifelse(is_home, PTS_home, PTS_away),
+    REB = ifelse(is_home, REB_home, REB_away),
+    AST = ifelse(is_home, AST_home, AST_away),
+    FG_PCT = ifelse(is_home, FG_PCT_home, FG_PCT_away),
+    FT_PCT = ifelse(is_home, FT_PCT_home, FT_PCT_away),
+    FG_3_PCT = ifelse(is_home, FG3_PCT_home, FG3_PCT_away),
+
+    MIL_WINS = ifelse((is_home & HOME_TEAM_WINS == 1) | (!is_home & HOME_TEAM_WINS == 0), 1, 0)
+  ) %>%
+  select(GAME_DATE_EST, PTS, REB, AST, FG_PCT, FT_PCT, FG_3_PCT, MIL_WINS)   
+
+# For Indiana Pacers (IND)
+ind_clean <- ind %>%
+  mutate(
+    is_home = ifelse(HOME_TEAM == "IND", TRUE, FALSE),
+    
+    # Extract IND's stats
+    PTS = ifelse(is_home, PTS_home, PTS_away),
+    REB = ifelse(is_home, REB_home, REB_away),
+    AST = ifelse(is_home, AST_home, AST_away),
+    FG_PCT = ifelse(is_home, FG_PCT_home, FG_PCT_away),
+    FT_PCT = ifelse(is_home, FT_PCT_home, FT_PCT_away),
+    FG_3_PCT = ifelse(is_home, FG3_PCT_home, FG3_PCT_away),
+    
+    IND_WINS = ifelse((is_home & HOME_TEAM_WINS == 1) | (!is_home & HOME_TEAM_WINS == 0), 1, 0)
+  ) %>%
+  select(GAME_DATE_EST, PTS, REB, AST, FG_PCT, FT_PCT, FG_3_PCT, IND_WINS)
+
+# For Memphis Grizzlies (MEM)
+mem_clean <- mem %>%
+  mutate(
+    is_home = ifelse(HOME_TEAM == "MEM", TRUE, FALSE),
+    
+    # Extract MEM's stats
+    PTS = ifelse(is_home, PTS_home, PTS_away),
+    REB = ifelse(is_home, REB_home, REB_away),
+    AST = ifelse(is_home, AST_home, AST_away),
+    FG_PCT = ifelse(is_home, FG_PCT_home, FG_PCT_away),
+    FT_PCT = ifelse(is_home, FT_PCT_home, FT_PCT_away),
+    FG_3_PCT = ifelse(is_home, FG3_PCT_home, FG3_PCT_away),
+    
+    MEM_WINS = ifelse((is_home & HOME_TEAM_WINS == 1) | (!is_home & HOME_TEAM_WINS == 0), 1, 0)
+  ) %>%
+  select(GAME_DATE_EST, PTS, REB, AST, FG_PCT, FT_PCT, FG_3_PCT, MEM_WINS)
+```
+
+```{r echo=FALSE}
+# Ensure GAME_DATE_EST is in Date format
+okc_clean <- okc_clean %>%
+  mutate(GAME_DATE_EST = as.Date(GAME_DATE_EST))
+
+# Sort by GAME_DATE_EST to calculate rest days correctly
+okc_clean <- okc_clean %>%
+  arrange(GAME_DATE_EST)
+
+# Calculate the rest days between consecutive games
+okc_clean <- okc_clean %>%
+  mutate(
+    rest_days = as.integer(GAME_DATE_EST - lag(GAME_DATE_EST, default = first(GAME_DATE_EST))),
+    
+    # Adjust for the case where the next game is on the very next day
+    rest_category = case_when(
+      rest_days == 1 ~ "0",   # If it's a back-to-back, it's 0 rest days
+      rest_days == 2 ~ "1",   # If the next game is on day 3, it's 1 rest day
+      rest_days >= 3 ~ "2+",  # Any gap of 3 or more days is 2+ rest days
+      TRUE ~ NA_character_    # Catch any unexpected cases
+    )
+  )
+
+# For Milwaukee Bucks (MIL)
+mil_clean <- mil_clean %>%
+  mutate(GAME_DATE_EST = as.Date(GAME_DATE_EST)) %>%
+  arrange(GAME_DATE_EST) %>%
+  mutate(
+    rest_days = as.integer(GAME_DATE_EST - lag(GAME_DATE_EST, default = first(GAME_DATE_EST))),
+    
+    rest_category = case_when(
+      rest_days == 1 ~ "0",    # Back-to-back: 0 rest days
+      rest_days == 2 ~ "1",    # 1 day of rest
+      rest_days >= 3 ~ "2+",   # 2+ days of rest
+      TRUE ~ NA_character_     # Handle unexpected cases
+    )
+  )
+
+# For Indiana Pacers (IND)
+ind_clean <- ind_clean %>%
+  mutate(GAME_DATE_EST = as.Date(GAME_DATE_EST)) %>%
+  arrange(GAME_DATE_EST) %>%
+  mutate(
+    rest_days = as.integer(GAME_DATE_EST - lag(GAME_DATE_EST, default = first(GAME_DATE_EST))),
+    
+    rest_category = case_when(
+      rest_days == 1 ~ "0",    # Back-to-back: 0 rest days
+      rest_days == 2 ~ "1",    # 1 day of rest
+      rest_days >= 3 ~ "2+",   # 2+ days of rest
+      TRUE ~ NA_character_     # Handle unexpected cases
+    )
+  )
+
+# For Memphis Grizzlies (MEM)
+mem_clean <- mem_clean %>%
+  mutate(GAME_DATE_EST = as.Date(GAME_DATE_EST)) %>%
+  arrange(GAME_DATE_EST) %>%
+  mutate(
+    rest_days = as.integer(GAME_DATE_EST - lag(GAME_DATE_EST, default = first(GAME_DATE_EST))),
+    
+    rest_category = case_when(
+      rest_days == 1 ~ "0",    # Back-to-back: 0 rest days
+      rest_days == 2 ~ "1",    # 1 day of rest
+      rest_days >= 3 ~ "2+",   # 2+ days of rest
+      TRUE ~ NA_character_     # Handle unexpected cases
+    )
+  )
+```
+
+```{r echo=FALSE}
+library(ggplot2)
+# Remove rows with NA in rest_category
+okc_long <- okc_clean %>%
+  select(rest_category, PTS, REB, AST, FG_PCT, FT_PCT, FG_3_PCT) %>%
+  tidyr::pivot_longer(cols = -rest_category, names_to = "Stat", values_to = "Value") %>%
+  filter(!is.na(rest_category))  # Remove rows with NA rest_category
+
+# Boxplot for different stats based on rest days
+ggplot(okc_long, aes(x = rest_category, y = Value, fill = rest_category)) +
+  geom_boxplot() +
+  facet_wrap(~Stat, scales = "free") +  # Separate plots for each stat
+  labs(title = "OKC Performance by Rest Days", x = "Rest Days", y = "Stat Value") +
+  theme_minimal() +
+  scale_fill_manual(values = c("red", "blue", "green"))
+
+# For Milwaukee Bucks (MIL)
+mil_long <- mil_clean %>%
+  select(rest_category, PTS, REB, AST, FG_PCT, FT_PCT, FG_3_PCT) %>%
+  tidyr::pivot_longer(cols = -rest_category, names_to = "Stat", values_to = "Value") %>%
+  filter(!is.na(rest_category))  # Remove rows with NA rest_category
+
+# Boxplot for MIL performance by rest days
+ggplot(mil_long, aes(x = rest_category, y = Value, fill = rest_category)) +
+  geom_boxplot() +
+  facet_wrap(~Stat, scales = "free") +  # Separate plots for each stat
+  labs(title = "MIL Performance by Rest Days", x = "Rest Days", y = "Stat Value") +
+  theme_minimal() +
+  scale_fill_manual(values = c("red", "blue", "green"))
+
+# For Indiana Pacers (IND)
+ind_long <- ind_clean %>%
+  select(rest_category, PTS, REB, AST, FG_PCT, FT_PCT, FG_3_PCT) %>%
+  tidyr::pivot_longer(cols = -rest_category, names_to = "Stat", values_to = "Value") %>%
+  filter(!is.na(rest_category))  # Remove rows with NA rest_category
+
+# Boxplot for IND performance by rest days
+ggplot(ind_long, aes(x = rest_category, y = Value, fill = rest_category)) +
+  geom_boxplot() +
+  facet_wrap(~Stat, scales = "free") +  # Separate plots for each stat
+  labs(title = "IND Performance by Rest Days", x = "Rest Days", y = "Stat Value") +
+  theme_minimal() +
+  scale_fill_manual(values = c("red", "blue", "green"))
+
+# For Memphis Grizzlies (MEM)
+mem_long <- mem_clean %>%
+  select(rest_category, PTS, REB, AST, FG_PCT, FT_PCT, FG_3_PCT) %>%
+  tidyr::pivot_longer(cols = -rest_category, names_to = "Stat", values_to = "Value") %>%
+  filter(!is.na(rest_category))  # Remove rows with NA rest_category
+
+# Boxplot for MEM performance by rest days
+ggplot(mem_long, aes(x = rest_category, y = Value, fill = rest_category)) +
+  geom_boxplot() +
+  facet_wrap(~Stat, scales = "free") +  # Separate plots for each stat
+  labs(title = "MEM Performance by Rest Days", x = "Rest Days", y = "Stat Value") +
+  theme_minimal() +
+  scale_fill_manual(values = c("red", "blue", "green"))
+
+```
+
+```{r echo=FALSE}
+# Calculate win percentage for each rest category
+win_rate <- okc_clean %>%
+  group_by(rest_category) %>%
+  summarise(win_pct = mean(OKC_WINS) * 100) %>%
+  filter(!is.na(rest_category))  # Remove NA from rest_category
+
+# Bar chart for OKC win percentage by rest days
+ggplot(win_rate, aes(x = rest_category, y = win_pct, fill = rest_category)) +
+  geom_col() +
+  labs(title = "OKC Win Percentage by Rest Days", x = "Rest Days", y = "Win Percentage (%)") +
+  theme_minimal() +
+  scale_fill_manual(values = c("red", "blue", "green")) +
+  geom_text(aes(label = round(win_pct, 1)), vjust = -0.5)  # Show win % on bars
+
+# For Milwaukee Bucks (MIL)
+mil_win_rate <- mil_clean %>%
+  group_by(rest_category) %>%
+  summarise(win_pct = mean(MIL_WINS) * 100) %>%
+  filter(!is.na(rest_category))  # Remove NA from rest_category
+
+# Bar chart for MIL win percentage by rest days
+ggplot(mil_win_rate, aes(x = rest_category, y = win_pct, fill = rest_category)) +
+  geom_col() +
+  labs(title = "MIL Win Percentage by Rest Days", x = "Rest Days", y = "Win Percentage (%)") +
+  theme_minimal() +
+  scale_fill_manual(values = c("red", "blue", "green")) +
+  geom_text(aes(label = round(win_pct, 1)), vjust = -0.5)  # Show win % on bars
+
+# For Indiana Pacers (IND)
+ind_win_rate <- ind_clean %>%
+  group_by(rest_category) %>%
+  summarise(win_pct = mean(IND_WINS) * 100) %>%
+  filter(!is.na(rest_category))  # Remove NA from rest_category
+
+# Bar chart for IND win percentage by rest days
+ggplot(ind_win_rate, aes(x = rest_category, y = win_pct, fill = rest_category)) +
+  geom_col() +
+  labs(title = "IND Win Percentage by Rest Days", x = "Rest Days", y = "Win Percentage (%)") +
+  theme_minimal() +
+  scale_fill_manual(values = c("red", "blue", "green")) +
+  geom_text(aes(label = round(win_pct, 1)), vjust = -0.5)  # Show win % on bars
+
+# For Memphis Grizzlies (MEM)
+mem_win_rate <- mem_clean %>%
+  group_by(rest_category) %>%
+  summarise(win_pct = mean(MEM_WINS) * 100) %>%
+  filter(!is.na(rest_category))  # Remove NA from rest_category
+
+# Bar chart for MEM win percentage by rest days
+ggplot(mem_win_rate, aes(x = rest_category, y = win_pct, fill = rest_category)) +
+  geom_col() +
+  labs(title = "MEM Win Percentage by Rest Days", x = "Rest Days", y = "Win Percentage (%)") +
+  theme_minimal() +
+  scale_fill_manual(values = c("red", "blue", "green")) +
+  geom_text(aes(label = round(win_pct, 1)), vjust = -0.5)  # Show win % on bars
+```
